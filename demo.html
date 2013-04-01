@@ -1,0 +1,32 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <script type="text/javascript" src="emcty-min.js"></script>
+</head>
+<body>
+    <script type="text/temp" id="temp1">
+        <li><%=model.num%></li>
+    </script>
+    <div id="view"></div>
+    <script type="text/temp" id="temp2">
+        <ul>
+            <%for(var i=0,l=model.length;i<l;i++){%>
+                <%=emcty.render('temp1',model[i])%>
+            <%}%>
+        </ul>
+    </script>
+    <div id="view2"></div>
+    <script type="text/javascript">
+        var data=[];
+        for(var i=0;i<10000;i++){
+            data.push({num:i});
+        }
+        
+        emcty.set('temp1',document.getElementById("temp1").innerHTML);
+        emcty.set('temp2',document.getElementById("temp2").innerHTML);
+        var t=new Date().getTime();
+        document.getElementById('view').innerHTML=emcty.render('temp2',data);
+        document.write('emcty:'+(new Date().getTime()-t));
+    </script>
+</body>
+</html>
