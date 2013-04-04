@@ -49,14 +49,6 @@
         sa += "return _";
         return new Function(Array.prototype.slice.call(arguments).slice(1), sa)
     },
-    _engineFactory=function (cacheId, template) {
-        var cacheEngine = _cache[cacheId];
-        if (cacheEngine == null) {
-            cacheEngine = _compile(template, 'model');
-            _cache[cacheId] = cacheEngine
-        }
-        return cacheEngine
-    },
     _emcty = {
         compile: _compile,
         render: function (cacheId,model) {
