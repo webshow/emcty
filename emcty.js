@@ -1,78 +1,116 @@
-(function () {
+/**
+ * @license
+ * emcty 0.1
+ * aohailin@gmail.com`
+ */
+(function(root) {
     var _cache = {},
-    _encode = function (s) {
-        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;').replace(/"/g, '&quot;')
-    },
-    _trimTemp=function(t){
-        return t.replace(/\r|\n|\t|^s+|s+$/g, '').replace(/\s+</g,'<').replace(/>\s+/g,'>')
-    },
-    _compile = function (t) {
-        t=_trimTemp(t);
-        var cs = false,ce = false,sa = "var _='';",ct='',ht='';
-        for (var i = 0, l = t.length; i < l; i++) {
-            var c = t.charAt(i);
-            if (!cs && c == '<' && i < l - 1 && t.charAt(i + 1) == '%') {
-                if(ht.length>0){
-                    sa+="_+='"+ht.replace(/'/g, "\\'")+"';";
-                    ht=''
+        _plugin,
+        _setting = {
+            startTag: '<%',
+            evaluate: '=',
+            escape: '-',
+            endTag: '%>'
+        },
+        _formatMap = {
+            "'": "'",
+            '\\': '\\',
+            '\r': 'r',
+            '\n': 'n',
+            '\t': 't',
+            '\u2028': 'u2028',
+            '\u2029': 'u2029'
+        },
+        _formatReg = /\\|'|\r|\n|\t|\u2028|\u2029/g,
+        _formatHandler = function(match) {
+            return '\\' + _formatMap[match]
+        },
+        _format = function(s) {
+            return _formatReg.test(s) ? s.replace(_formatReg, _formatHandler) : s
+        },
+        _escapeMap = {
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '`': '&#96;',
+            '"': '&quot;',
+            '&': '&amp;'
+        },
+        _escapeReg = /<|>|'|"|&|`/g,
+        _escapeHandler = function(s) {
+            return _escapeMap[s]
+        },
+        _escape = function(s) {
+            return _escapeReg.test(s) ? s.replace(_escapeReg, _escapeHandler) : s
+        },
+        _compile = function(t) {
+            var startIndex = 0,
+                endIndex = 0,
+                sourceCode = '',
+                tempLen = t.length;
+            var startIndex = t.indexOf(_setting.startTag);
+            while (startIndex > 0 && startIndex < tempLen) {
+                if (endIndex < startIndex) {
+                    sourceCode += _format(t.substring(endIndex + 2, startIndex))
                 }
-                cs = true;
-                i++;
-                continue
-            } 
-            if (cs && c == '>' && t.charAt(i - 1) == '%') {
-                ct=ct.slice(0,ct.length-1);
-                cs = false;
-                ce = true
-            } 
-            if(cs&&!ce){
-                ct+=c
-            }else if(ce){
-                var d=ct.charAt(0);
-                if (d== '=') {
-                    sa += '_+=' + ct.slice(1) + ';'
-                } else if (d == ':') {
-                    sa += '_+=' + _encode(ct.slice(1)) + ';'
-                } else {
-                    sa += ct
+                endIndex = t.indexOf(_setting.endTag, startIndex);
+                if (endIndex < 0) {
+                    endIndex = startIndex - 2;
+                    break;
                 }
-                ct='';
-                cs=false;
-                ce=false
-            }else{
-                ht+=c
+                switch (t.charAt(startIndex + 2)) {
+                    case _setting.evaluate:
+                        sourceCode += "'+\n((__t=(" + t.substring(startIndex + 3, endIndex) + "))==null?'':__t)+\n'";
+                        break;
+                    case _setting.escape:
+                        sourceCode += "'+\n__escape(" + t.substring(startIndex + 3, endIndex) + ")+\n'";
+                        break;
+                    default:
+                        sourceCode += "';\n" + t.substring(startIndex + 2, endIndex) + "\n__p+='";
+                        break;
+                }
+                startIndex = t.indexOf(_setting.startTag, endIndex)
             }
-        }
-        if(ht.length>0){
-            sa+="_+='"+ht.replace(/'/g, "\\'")+"';"
-        }
-        sa += "return _";
-        return new Function(Array.prototype.slice.call(arguments).slice(1), sa)
-    },
-    _emcty = {
-        compile: _compile,
-        render: function (cacheId,model) {
-            var cacheEngine = _cache[cacheId];
-            if(cacheEngine==null)return null;
-            return cacheEngine(model)
+            if (sourceCode == '') {
+                sourceCode = _format(t)
+            } else if (endIndex + 2 < tempLen) {
+                sourceCode += _format(t.substring(endIndex + 2, tempLen))
+            }
+            sourceCode = "var __t='',__p='" + sourceCode + "';\nreturn __p";
+            try {
+                var _tempFunc = new Function('model', '__escape', 'plugin', sourceCode);
+                var render = function(data) {
+                    return _tempFunc.call(this, data, _escape, _plugin)
+                };
+                render.source = "function(model){\n" + sourceCode + "\n}";
+                return render
+            } catch (e) {
+                e.source = sourceCode;
+                throw e
+            }
         },
-        set: function (cacheId, template) {
-            _cache[cacheId] = _compile(template, 'model')
-        },
-        get: function (cacheId) {
-            return _cache.hasOwnProperty(cacheId) ? _cache[cacheId] : null
-        },
-        remove: function (cacheId) {
-            _cache.hasOwnProperty(cacheId) && delete _cache[cacheId]
-        },
-        clear: function () {
-            _cache = {}
-        }
-    };
-    //export
-    if (typeof module !== 'undefined' && module.exports) {
-        module.exports = _emcty
-    } else {
-        window.emcty = _emcty
+        _emcty = {
+            setting: function(setting) {
+                for (var s in setting)
+                    _setting.hasOwnProperty(s) && (_setting[s] = setting[s]);
+                if (_setting.startTag.length != 2 || _setting.endTag.length != 2) {
+                    throw new Error('tag format error.')
+                }
+            },
+            plugin: function(plugin) {
+                _plugin = plugin
+            },
+            template: function(tempId, template) {
+                return tempId ? _cache[tempId] = _compile(template) : _compile(template) 
+            },
+            render: function(tempId, model) {
+                return _cache.hasOwnProperty(tempId) ? _cache[tempId](model) : null
+            }
+        };
+    root.emcty = _emcty;
+    if (typeof define === 'function' && define.amd) {
+        define('emcty', [], function() {
+            return _emcty
+        })
     }
-})()
+})(this)

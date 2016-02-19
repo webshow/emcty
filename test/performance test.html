@@ -1,0 +1,46 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <script type="text/javascript" src="../emcty-min.js"></script>
+    <script type="text/javascript" src="lodash-min.js"></script>
+    <!--<script type="text/javascript" src="underscore-min.js"></script>-->
+</head>
+<body>
+    <script type="text/temp" id="temp">
+        <ul>
+            <%for(var i=0,l=model.length;i<l;i++){%>
+                <li><%-model[i].num.toString()%></li>
+            <%}%>
+        </ul>
+    <%</script>
+    <div id="view"></div>
+    <script type="text/javascript">
+        var data=[],
+        temp=document.getElementById("temp").innerHTML,
+        t,engine,html,source,sourceLength=1,loopCount=1000;
+        for(var i=0;i<sourceLength;i++){
+            data.push({num:i});
+        }
+
+        t=new Date().getTime();
+        for(var i=0;i<loopCount;i++){
+            engine=_.template(temp,{variable:'model'});
+        }
+        html=engine(data);
+        source=engine.source;
+        console.log('underscore cost time:'+(new Date().getTime()-t));
+        // console.log('underscore source:\n'+source);
+
+        t=new Date().getTime();
+        for(var i=0;i<loopCount;i++){
+            engine=emcty.template('test',temp);
+        }
+        html=engine(data);
+        source=engine.source;
+        console.log('emcty cost time:'+(new Date().getTime()-t));
+        // console.log('emcty source:\n'+source);
+        // document.getElementById("view").innerHTML=html;
+        
+    </script>
+</body>
+</html>
